@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>How It Works — Recovery</title>
+  <style>
+    html, body { margin: 0; min-height: 100%; background: var(--bg, #000); color: var(--ink, #f2f2f2); font: 18px/1.5 -apple-system, system-ui, sans-serif; }
+    main { max-width: 38rem; margin: 0 auto; padding: 12vh 1.5rem 6rem; }
+    h1 { font-weight: 500; font-size: 1.6rem; }
+    p { color: var(--ink); opacity: 0.78; }
+    a { color: inherit; }
+    nav { display: flex; flex-direction: column; gap: 0.75rem; margin: 2.5rem 0; }
+    nav a { display: block; text-decoration: none; border: 1px solid color-mix(in srgb, var(--ink) 18%, transparent); padding: 0.9rem 1rem; }
+    nav a span { display: block; color: var(--ink); opacity: 0.55; font-size: 0.9rem; margin-top: 0.2rem; }
+    nav a.master { border-color: color-mix(in srgb, var(--ink) 35%, transparent); background: color-mix(in srgb, var(--ink) 6%, transparent); }
+    .support { margin-top: 3rem; font-size: 0.85rem; color: var(--ink); opacity: 0.5; text-align: center; }
+    .support a { text-decoration: underline; opacity: 0.8; }
+    #stage { min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 8vh 8vw; box-sizing: border-box; gap: 2.5rem; font-size: 22px; }
+    #line { margin: 0; max-width: 24em; min-height: 1.5em; white-space: pre-line; }
+    #recovery { width: 120px; height: auto; }
+    #bar { position: fixed; top: 1rem; left: 1rem; right: 1rem; display: flex; justify-content: space-between; gap: 1rem; align-items: center; flex-wrap: wrap; }
+    #bar a, #setlabel, #switch, #themes button { color: var(--ink); opacity: 0.65; background: transparent; border: 0; font: 13px -apple-system, system-ui, sans-serif; text-decoration: none; cursor: pointer; }
+    #switch { border: 1px solid color-mix(in srgb, var(--ink) 25%, transparent); padding: 0.4rem 0.6rem; }
+    #themes { display: flex; gap: 0.4rem; }
+    #themes i { display: block; width: 14px; height: 14px; border-radius: 50%; box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ink) 40%, transparent); }
+  </style>
+</head>
+<body>
+  <div id="app"></div>
+  <script>
+    const FEEDING = "https://give.feedingamerica.org/8u355rD-u02ytwE0jUq9jQ2?source=Y26YP6D1Z&utm_medium=cpc&utm_source=paid&utm_term=gift&utm_content=bing&utm_campaign=thanksgiving&gclid=49b8ac7ea3a91f16ecc9c6b927de9e79&gclsrc=3p.ds&msclkid=49b8ac7ea3a91f16ecc9c6b927de9e79";
+    const COFFEE = "https://buymeacoffee.com/estheraloe";
+    const params = new URLSearchParams(location.search);
+    const page = params.get("page") || "home";
+    const app = document.getElementById("app");
+    const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    let paused = false;
+    let pauseWaiters = [];
+
+    const themes = [
+      ["#000000","#f2f2f2"],
+      ["#141a24","#e7eef8"],
+      ["#1c1714","#f3ebe3"],
+      ["#10211c","#e7f3ee"],
+      ["#ffffff","#1a1a1a"],
+      ["#f7f5f2","#2a241f"],
+      ["#eef3f0","#1a2e28"]
+    ];
+    function loadTheme() {
+      try {
+        const saved = JSON.parse(localStorage.getItem("theme") || "null");
+        if (Array.isArray(saved) && saved.length === 2) return saved;
+      } catch (e) {}
+      return themes[0];
+    }
+    function applyTheme(theme) {
+      document.documentElement.style.setProperty("--bg", theme[0]);
+      document.documentElement.style.setProperty("--ink", theme[1]);
+      localStorage.setItem("theme", JSON.stringify(theme));
+    }
+    applyTheme(loadTheme());
+
+    function themeDots() {
+      return `<div id="themes">${themes.map((t, i) => `<button type="button" data-i="${i}" aria-label="Theme ${i + 1}"><i style="background:${t[0]}"></i></button>`).join("")}</div>`;
+    }
+    function bindDots() {
+      document.querySelectorAll("#themes button").forEach((button) => {
+        button.addEventListener("click", (event) => { event.stopPropagation(); applyTheme(themes[button.dataset.i]); });
+      });
+    }
+    function bindPause(stage) {
+      stage.addEventListener("click", (event) => {
+        if (event.target.closest("a, button")) return;
+        paused = !paused;
+        if (!paused) pauseWaiters.splice(0).forEach((resume) => resume());
+      });
+    }
+    function waitWhilePaused() {
+      if (!paused) return Promise.resolve();
+      return new Promise((resolve) => pauseWaiters.push(resolve));
+    }
+
+    const sleep = async (ms) => {
+      let left = ms;
+      while (left > 0) {
+        await waitWhilePaused();
+        const chunk = Math.min(50, left);
+        await new Promise((r) => setTimeout(r, chunk));
+        left -= chunk;
+      }
+      await waitWhilePaused();
+    };
+    function delaysBetween(min, max) {
+      const values = [];
+      for (let v = min; v <= max; v += 5) values.push(v);
+      return values;
+    }
+    async function typeLine(el, text, delays, hold) {
+      await waitWhilePaused();
+      if (reduceMotion) el.textContent = text;
+      else {
+        el.textContent = "";
+        for (const ch of text) { await waitWhilePaused(); el.textContent += ch; await sleep(delays[Math.floor(Math.random() * delays.length)]); }
+      }
+      await sleep(hold);
+    }
+
+    const recoverySVG = `<svg id="recovery" viewBox="0 0 120 140" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <g transform="translate(60, 48)" stroke="currentColor" stroke-width="2.2" fill="none" stroke-linejoin="round">
+        <circle cx="0" cy="0" r="22"/>
+        <path d="M0 -16 L14 10 L-14 10 Z"/>
+      </g>
+      <g transform="translate(0, 88)">
+        <path d="M8 16 C24 8 36 24 52 16 C68 8 80 24 96 16 C104 12 112 12 116 14" 
+              fill="none" stroke="currentColor" stroke-opacity="0.75" stroke-width="2" stroke-linecap="round"/>
+        <path d="M8 26 C24 18 36 34 52 26 C68 18 80 34 96 26 C104 22 112 22 116 24" 
+              fill="none" stroke="currentColor" stroke-opacity="0.5" stroke-width="2" stroke-linecap="round"/>
+        <path d="M8 36 C24 28 36 44 52 36 C68 28 80 44 96 36 C104 32 112 32 116 34" 
+              fill="none" stroke="currentColor" stroke-opacity="0.3" stroke-width="2" stroke-linecap="round"/>
+      </g>
+    </svg>`;
+
+    const preamble = `Rarely have we seen a person fail who has thoroughly followed our path. Those who do not recover are people who cannot or will not completely give themselves to this simple program, usually men and women who are constitutionally incapable of being honest with themselves. There are such unfortunates. They are not at fault; they seem to have been born that way. They are naturally incapable of grasping and developing a manner of living which demands rigorous honesty. Their chances are less than average. There are those, too, who suffer from grave emotional and mental disorders, but many of them do recover if they have the capacity to be honest.
+
+Our stories disclose in a general way what we used to be like, what happened, and what we are like now. If you have decided you want what we have and are willing to go to any length to get it—then you are ready to take certain steps.
+
+At some of these we balked. We thought we could find an easier, softer way. But we could not. With all the earnestness at our command, we beg of you to be fearless and thorough from the very start. Some of us have tried to hold on to our old ideas and the result was nil until we let go absolutely.
+
+Remember that we deal with alcohol—cunning, baffling, powerful! Without help it is too much for us. But there is One who has all power—that One is God. May you find Him now!
+
+Half measures availed us nothing. We stood at the turning point. We asked His protection and care with complete abandon.
+
+Here are the steps we took, which are suggested as a program of recovery:`;
+
+    const steps = [
+      "Step 1\n\nWe admitted we were powerless over alcohol—that our lives had become unmanageable.",
+      "Step 2\n\nCame to believe that a Power greater than ourselves could restore us to sanity.",
+      "Step 3\n\nMade a decision to turn our will and our lives over to the care of God as we understood Him.",
+      "Step 4\n\nMade a searching and fearless moral inventory of ourselves.",
+      "Step 5\n\nAdmitted to God, to ourselves, and to another human being the exact nature of our wrongs.",
+      "Step 6\n\nWere entirely ready to have God remove all these defects of character.",
+      "Step 7\n\nHumbly asked Him to remove our shortcomings.",
+      "Step 8\n\nMade a list of all persons we had harmed, and became willing to make amends to them all.",
+      "Step 9\n\nMade direct amends to such people wherever possible, except when to do so would injure them or others.",
+      "Step 10\n\nContinued to take personal inventory and when we were wrong promptly admitted it.",
+      "Step 11\n\nSought through prayer and meditation to improve our conscious contact with God as we understood Him, praying only for knowledge of His will for us and the power to carry that out.",
+      "Step 12\n\nHaving had a spiritual awakening as the result of these steps, we tried to carry this message to alcoholics, and to practice these principles in all our affairs."
+    ];
+
+    if (page === "home") {
+      app.innerHTML = `<main>
+        <h1>How It Works</h1>
+        <p>A quiet screen for the Twelve Steps.</p>
+        <nav>
+          <a href="?page=steps&mode=all" class="master">Play All<span>How It Works followed by the Twelve Steps.</span></a>
+          <a href="?page=steps&mode=preamble">How It Works<span>The preamble from the Big Book.</span></a>
+          <a href="?page=steps&mode=steps">The Twelve Steps<span>Steps 1 through 12.</span></a>
+        </nav>
+        <p class="support">Support: <a href="${FEEDING}" target="_blank">Feeding America</a> · <a href="${COFFEE}" target="_blank">Buy me a coffee</a></p>
+      </main>`;
+    }
+
+    if (page === "steps") {
+      const mode = params.get("mode") || "all";
+      const modes = ["all", "preamble", "steps"];
+      const nextMode = modes[(modes.indexOf(mode) + 1) % modes.length];
+      const modeLabel = mode === "all" ? "All" : mode === "preamble" ? "How It Works" : "Steps Only";
+
+      let lines = [];
+      if (mode === "preamble") lines = [preamble];
+      else if (mode === "steps") lines = steps;
+      else lines = [preamble, ...steps];
+
+      app.innerHTML = `<div id="bar"><a href="?">Back</a><button id="switch" type="button" aria-label="Switch mode">${modeLabel}</button>${themeDots()}</div><div id="stage"><p id="line"></p>${recoverySVG}</div>`;
+      bindDots();
+      bindPause(document.getElementById("stage"));
+      document.getElementById("switch").addEventListener("click", () => { location.search = "?page=steps&mode=" + nextMode; });
+      const line = document.getElementById("line");
+      const delays = delaysBetween(70, 110);
+      (async function run() {
+        while (true) for (let i = 0; i < lines.length; i++) {
+          await typeLine(line, lines[i], delays, i === lines.length - 1 ? 3200 : 1800);
+        }
+      })();
+    }
+  </script>
+</body>
+</html>
